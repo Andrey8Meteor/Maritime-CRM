@@ -15,16 +15,13 @@ import {
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { 
-  getDashboardStats, 
-  getExpiringDocuments, 
-  getUpcomingRotations, 
-  getRecentSailors,
+  getDashboardSummary, 
   sendExpiryNotifications 
 } from '../utils/api';
 import { formatDate, cn } from '../utils/helpers';
 import { toast } from 'sonner';
 
-const StatCard = ({ icon: Icon, label, value, color, link }) => (
+const StatCard = React.memo(({ icon: Icon, label, value, color, link }) => (
   <Link 
     to={link}
     className="bg-maritime-card border border-slate-800 rounded-md p-5 hover:border-primary/30 transition-colors group"
@@ -44,7 +41,7 @@ const StatCard = ({ icon: Icon, label, value, color, link }) => (
       <ArrowRight size={14} className="ml-1" />
     </div>
   </Link>
-);
+));
 
 export default function DashboardPage() {
   const { t, language } = useLanguage();
@@ -59,7 +56,7 @@ export default function DashboardPage() {
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (isAuthenticated && !authLoading && !dataLoading) {
+    if (isAuthenticated && !authLoading) {
       loadDashboardData();
     }
   }, [isAuthenticated, authLoading]);
@@ -71,16 +68,12 @@ export default function DashboardPage() {
 
     try {
       setDataLoading(true);
-      const [statsRes, expiringRes, rotationsRes, recentRes] = await Promise.all([
-        getDashboardStats(),
-        getExpiringDocuments(),
-        getUpcomingRotations(),
-        getRecentSailors(5)
-      ]);
-      setStats(statsRes.data);
-      setExpiringDocs(expiringRes.data);
-      setRotations(rotationsRes.data);
-      setRecentSailors(recentRes.data);
+      const response = await getDashboardSummary();
+      const data = response.data;
+      setStats(data.stats);
+      setExpiringDocs(data.expiring_documents || []);
+      setRotations(data.upcoming_rotations || []);
+      setRecentSailors(data.recent_sailors || []);
     } catch (error) {
       toast.error(language === 'ru' ? 'Ошибка загрузки данных' : 'Failed to load data');
     } finally {

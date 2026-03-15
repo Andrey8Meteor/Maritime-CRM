@@ -3,14 +3,19 @@ import { useNavigate } from 'react-router-dom';
 import { Anchor, Mail, Lock, AlertCircle, Globe } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import { cn } from '../utils/helpers';
+import axios from 'axios';
 import { seedDemoData } from '../utils/api';
 import { toast } from 'sonner';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [fullName, setFullName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [registerMode, setRegisterMode] = useState(false);
   const [seeding, setSeeding] = useState(false);
   const [redirecting, setRedirecting] = useState(false);
   
@@ -20,6 +25,35 @@ export default function LoginPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (registerMode) {
+      if (password !== confirmPassword) {
+        setError(language === 'ru' ? 'Пароли не совпадают' : 'Passwords do not match');
+        return;
+      }
+      if (!fullName.trim()) {
+        setError(language === 'ru' ? 'Введите полное имя' : 'Enter full name');
+        return;
+      }
+
+      try {
+        const response = await axios.post(`${process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001'}/api/auth/register`, {
+          email,
+          password,
+          full_name: fullName,
+        });
+        const { access_token } = response.data;
+        localStorage.setItem('maritimecrm_token', access_token);
+        toast.success(language === 'ru' ? 'Регистрация успешна!' : 'Registration successful!');
+        setRegisterMode(false);
+        setFullName('');
+        setConfirmPassword('');
+        setPassword('');
+      } catch (err) {
+        setError(err.response?.data?.detail || (language === 'ru' ? 'Ошибка регистрации' : 'Registration failed'));
+      }
+      return;
+    }
+
     setError('');
     setLoading(true);
     setRedirecting(false);
@@ -89,7 +123,44 @@ export default function LoginPage() {
               </div>
             )}
 
+            <div className="flex mb-6">
+              <button
+                type="button"
+                onClick={() => setRegisterMode(false)}
+                className={cn(
+                  "flex-1 py-2 px-4 rounded-l-md border border-slate-800 font-medium transition-colors",
+                  !registerMode ? "bg-slate-700 border-primary text-white" : "text-slate-400 hover:bg-slate-800/50"
+                )}
+              >
+                {language === 'ru' ? 'Вход' : 'Login'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setRegisterMode(true)}
+                className={cn(
+                  "flex-1 py-2 px-4 rounded-r-md border border-slate-800 font-medium transition-colors",
+                  registerMode ? "bg-slate-700 border-primary text-white" : "text-slate-400 hover:bg-slate-800/50"
+                )}
+              >
+                {language === 'ru' ? 'Регистрация' : 'Register'}
+              </button>
+            </div>
+
             <form onSubmit={handleSubmit} className="space-y-5">
+              {registerMode && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">{language === 'ru' ? 'Полное имя' : 'Full Name'}</label>
+                  <input
+                    type="text"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-md text-slate-100 placeholder:text-slate-600 focus:border-primary focus:ring-1 focus:ring-primary/20"
+                    placeholder={language === 'ru' ? 'Иван Петров' : 'John Doe'}
+                    required
+                  />
+                </div>
+              )}
+
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">{t('email')}</label>
                 <div className="relative">
@@ -99,7 +170,7 @@ export default function LoginPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="w-full pl-10 pr-4 py-3 bg-slate-950 border border-slate-800 rounded-md text-slate-100 placeholder:text-slate-600 focus:border-primary focus:ring-1 focus:ring-primary/20"
-                    placeholder="admin@maritimecrm.com"
+                    placeholder="user@example.com"
                     required
                     data-testid="login-email"
                   />
@@ -122,14 +193,32 @@ export default function LoginPage() {
                 </div>
               </div>
 
+              {registerMode && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">{language === 'ru' ? 'Подтвердите пароль' : 'Confirm Password'}</label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                    <input
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="w-full pl-10 pr-4 py-3 bg-slate-950 border border-slate-800 rounded-md text-slate-100 placeholder:text-slate-600 focus:border-primary focus:ring-1 focus:ring-primary/20"
+                      placeholder="••••••••"
+                      required
+                    />
+                  </div>
+                </div>
+              )}
+
               <button
                 type="submit"
-                disabled={loading || redirecting}
+                disabled={loading || redirecting || (registerMode && password !== confirmPassword)}
                 className="w-full py-3 bg-primary hover:bg-primary-hover text-white font-medium rounded-md shadow-lg shadow-primary/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                data-testid="login-submit"
+                data-testid="auth-submit"
               >
                 {redirecting ? (language === 'ru' ? 'Перенаправление...' : 'Redirecting...') : 
-                 loading ? (language === 'ru' ? 'Вход...' : 'Signing in...') : t('signIn')}
+                 loading ? (language === 'ru' ? (registerMode ? 'Регистрация...' : 'Вход...') : (registerMode ? 'Registering...' : 'Signing in...')) : 
+                 registerMode ? (language === 'ru' ? 'Зарегистрироваться' : 'Register') : t('signIn')}
               </button>
             </form>
 

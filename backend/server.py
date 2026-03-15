@@ -139,6 +139,7 @@ class SailorCreate(BaseModel):
     rating: int = Field(default=3, ge=1, le=5)
     english_level: Optional[str] = None
     notes: Optional[str] = None
+    user_id: Optional[str] = None
 
 class SailorUpdate(BaseModel):
     full_name: Optional[str] = None
@@ -156,6 +157,7 @@ class SailorUpdate(BaseModel):
     rating: Optional[int] = None
     english_level: Optional[str] = None
     notes: Optional[str] = None
+    user_id: Optional[str] = None
 
 class CompanyContact(BaseModel):
     name: str
@@ -203,6 +205,7 @@ class VacancyCreate(BaseModel):
     contract_duration_months: int = 4
     status: VacancyStatus = VacancyStatus.OPEN
     notes: Optional[str] = None
+    user_id: Optional[str] = None
 
 class VacancyUpdate(BaseModel):
     company_id: Optional[str] = None
@@ -220,6 +223,7 @@ class VacancyUpdate(BaseModel):
     contract_duration_months: Optional[int] = None
     status: Optional[VacancyStatus] = None
     notes: Optional[str] = None
+    user_id: Optional[str] = None
 
 class ContractCreate(BaseModel):
     sailor_id: str
@@ -231,6 +235,7 @@ class ContractCreate(BaseModel):
     salary: int
     currency: str = "USD"
     notes: Optional[str] = None
+    user_id: Optional[str] = None
 
 class ContractUpdate(BaseModel):
     sign_date: Optional[datetime] = None
@@ -402,17 +407,18 @@ async def get_sailors(
     search: Optional[str] = None,
     current_user = Depends(get_current_user)
 ):
-    query = {}
+    query = {"user_id": current_user["id"]}
     if status:
         query["status"] = status.value
     if position:
         query["position"] = {"$regex": position, "$options": "i"}
     if search:
-        query["$or"] = [
+        or_query = {"$or": [
             {"full_name": {"$regex": search, "$options": "i"}},
             {"email": {"$regex": search, "$options": "i"}},
             {"phone": {"$regex": search, "$options": "i"}}
-        ]
+        ]}
+        query = {"$and": [query, or_query]}
     sailors = list(db.sailors.find(query))
     return serialize_docs(sailors)
 
@@ -426,6 +432,8 @@ async def get_sailor(sailor_id: str, current_user = Depends(get_current_user)):
 @app.post("/api/sailors")
 async def create_sailor(sailor: SailorCreate, current_user = Depends(get_current_user)):
     sailor_dict = sailor.model_dump()
+    if not sailor_dict.get("user_id"):
+        sailor_dict["user_id"] = current_user["id"]
     sailor_dict["created_at"] = datetime.now(timezone.utc)
     sailor_dict["documents"] = [d.model_dump() if hasattr(d, 'model_dump') else d for d in sailor_dict.get("documents", [])]
     sailor_dict["experience"] = [e.model_dump() if hasattr(e, 'model_dump') else e for e in sailor_dict.get("experience", [])]
@@ -456,12 +464,13 @@ async def delete_sailor(sailor_id: str, current_user = Depends(get_current_user)
 # Companies endpoints
 @app.get("/api/companies")
 async def get_companies(search: Optional[str] = None, current_user = Depends(get_current_user)):
-    query = {}
+    query = {"user_id": current_user["id"]}
     if search:
-        query["$or"] = [
+        or_query = {"$or": [
             {"name": {"$regex": search, "$options": "i"}},
             {"country": {"$regex": search, "$options": "i"}}
-        ]
+        ]}
+        query = {"$and": [query, or_query]}
     companies = list(db.companies.find(query))
     return serialize_docs(companies)
 
@@ -510,7 +519,7 @@ async def get_vacancies(
     vessel_type: Optional[VesselType] = None,
     current_user = Depends(get_current_user)
 ):
-    query = {}
+    query = {"user_id": current_user["id"]}
     if status:
         query["status"] = status.value
     if company_id:
@@ -558,7 +567,7 @@ async def get_contracts(
     sailor_id: Optional[str] = None,
     current_user = Depends(get_current_user)
 ):
-    query = {}
+    query = {"user_id": current_user["id"]}
     if status:
         query["status"] = status.value
     if sailor_id:
@@ -604,12 +613,12 @@ async def get_pipeline(
     stage: Optional[PipelineStage] = None,
     current_user = Depends(get_current_user)
 ):
-    query = {}
+    query = {"user_id": current_user["id"]}
     if vacancy_id:
         query["vacancy_id"] = vacancy_id
     if stage:
         query["stage"] = stage.value
-    candidates = list(db.pipeline.find(query))
+    candidates = list(db.pipeline.find(query).sort("order", 1))
     return serialize_docs(candidates)
 
 @app.post("/api/pipeline")
@@ -658,21 +667,71 @@ async def find_candidates(vacancy_id: str, authorization: Optional[str] = None):
     return serialize_docs(sailors)
 
 # Dashboard stats
-@app.get("/api/dashboard/stats")
-async def get_dashboard_stats(current_user = Depends(get_current_user)):
+@app.get("/api/dashboard/summary")
+async def get_dashboard_summary(current_user = Depends(get_current_user)):
+    user_match = {"user_id": current_user["id"]}
     
-    total_sailors = db.sailors.count_documents({})
-    available_sailors = db.sailors.count_documents({"status": SailorStatus.AVAILABLE.value})
-    open_vacancies = db.vacancies.count_documents({"status": VacancyStatus.OPEN.value})
-    active_contracts = db.contracts.count_documents({"status": {"$in": [ContractStatus.ON_BOARD.value, ContractStatus.PREPARATION.value]}})
-    total_companies = db.companies.count_documents({})
+    # Stats
+    stats = {
+        "total_sailors": db.sailors.count_documents(user_match),
+        "available_sailors": db.sailors.count_documents({"$and": [user_match, {"status": SailorStatus.AVAILABLE.value}]}),
+        "open_vacancies": db.vacancies.count_documents({"$and": [user_match, {"status": VacancyStatus.OPEN.value}]}),
+        "active_contracts": db.contracts.count_documents({"$and": [user_match, {"status": {"$in": [ContractStatus.ON_BOARD.value, ContractStatus.PREPARATION.value]}}]}),
+        "total_companies": db.companies.count_documents(user_match),
+    }
+    
+    # Pipeline by stage
+    pipeline_by_stage = dict(db.pipeline.aggregate([
+        {"$match": user_match},
+        {"$group": {"_id": "$stage", "count": {"$sum": 1}}},
+        {"$sort": {"_id": 1}}
+    ]))
+    
+    # Recent sailors (last 30 days)
+    recent_sailors = list(db.sailors.find({
+        "$and": [user_match, {"created_at": {"$gte": datetime.now(timezone.utc) - timedelta(days=30)}}]
+    }).sort("created_at", -1).limit(5))
+    
+    # Expiring documents (next 90 days, user sailors only)
+    three_months = datetime.now(timezone.utc) + timedelta(days=90)
+    expiring_docs = []
+    for sailor in db.sailors.find(user_match):
+        sailor_data = serialize_doc(sailor)
+        for doc in sailor_data.get("documents", []):
+            expiry = doc.get("expiry_date")
+            if expiry:
+                if isinstance(expiry, str):
+                    expiry = datetime.fromisoformat(expiry.replace("Z", "+00:00"))
+                if expiry <= three_months:
+                    expiring_docs.append({
+                        "sailor_id": sailor_data["id"],
+                        "sailor_name": sailor_data["full_name"],
+                        "document_type": doc["doc_type"],
+                        "expiry_date": expiry.isoformat(),
+                        "days_remaining": (expiry - datetime.now(timezone.utc)).days
+                    })
+    expiring_docs.sort(key=lambda x: x["days_remaining"])
+    
+    # Upcoming rotations (user contracts)
+    one_month = datetime.now(timezone.utc) + timedelta(days=30)
+    upcoming = []
+    for contract in db.contracts.find({"$and": [user_match, {"status": ContractStatus.ON_BOARD.value, "end_date": {"$lte": one_month}}]}):
+        c_data = serialize_doc(contract)
+        sailor = db.sailors.find_one({"_id": ObjectId(c_data["sailor_id"])})
+        vacancy = db.vacancies.find_one({"_id": ObjectId(c_data["vacancy_id"])})
+        upcoming.append({
+            "contract_id": c_data["id"],
+            "sailor_name": sailor["full_name"] if sailor else "Unknown",
+            "vessel_name": vacancy["vessel_name"] if vacancy else "Unknown",
+            "end_date": c_data["end_date"].isoformat()
+        })
     
     return {
-        "total_sailors": total_sailors,
-        "available_sailors": available_sailors,
-        "open_vacancies": open_vacancies,
-        "active_contracts": active_contracts,
-        "total_companies": total_companies
+        "stats": stats,
+        "pipeline_by_stage": pipeline_by_stage,
+        "recent_sailors": serialize_docs(recent_sailors),
+        "expiring_documents": expiring_docs[:10],  # top 10
+        "upcoming_rotations": upcoming
     }
 
 @app.get("/api/dashboard/expiring-documents")
@@ -757,6 +816,32 @@ async def send_expiry_notifications(background_tasks: BackgroundTasks, authoriza
             sent_count += 1
     
     return {"message": f"Queued {sent_count} notification emails"}
+
+# Indexes endpoint
+@app.post("/api/indexes")
+async def create_indexes(current_user = Depends(get_current_user)):
+    """Create performance indexes for user data"""
+    user_id = current_user["id"]
+    
+    # Sailors
+    db.sailors.create_index([("user_id", 1), ("status", 1)])
+    db.sailors.create_index([("user_id", 1), ("created_at", -1)])
+    
+    # Vacancies
+    db.vacancies.create_index([("user_id", 1), ("status", 1)])
+    db.vacancies.create_index([("user_id", 1), ("start_date", 1)])
+    
+    # Pipeline
+    db.pipeline.create_index([("user_id", 1), ("stage", 1), ("order", 1)])
+    
+    # Contracts
+    db.contracts.create_index([("user_id", 1), ("status", 1)])
+    db.contracts.create_index([("user_id", 1), ("end_date", 1)])
+    
+    # Users (global)
+    db.users.create_index("email")
+    
+    return {"message": f"Indexes created for user {user_id}", "collections": ["sailors", "vacancies", "pipeline", "contracts", "companies"]}
 
 # Health check
 @app.get("/api/health")

@@ -29,10 +29,16 @@ api.interceptors.response.use(
 );
 
 // Dashboard
+export const getDashboardSummary = () => api.get('/api/dashboard/summary');
+
+// Legacy endpoints (keep for now)
 export const getDashboardStats = () => api.get('/api/dashboard/stats');
 export const getExpiringDocuments = () => api.get('/api/dashboard/expiring-documents');
 export const getUpcomingRotations = () => api.get('/api/dashboard/upcoming-rotations');
 export const getRecentSailors = (limit = 5) => api.get(`/api/dashboard/recent-sailors?limit=${limit}`);
+
+// Pipeline reorder (for DnD)
+export const updatePipelineOrder = (id, data) => api.put(`/api/pipeline/${id}`, data);
 
 // Sailors
 export const getSailors = (params = {}) => api.get('/api/sailors', { params });

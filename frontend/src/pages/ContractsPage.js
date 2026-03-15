@@ -209,7 +209,7 @@ const ContractModal = ({ contract, sailors, vacancies, onClose, onSuccess }) => 
     end_date: contract?.end_date?.split('T')[0] || '',
     status: contract?.status || 'preparation',
     salary: contract?.salary || '',
-    currency: contract?.currency || 'USD',
+    currency: contract?.currency || 'RUB',
     notes: contract?.notes || ''
   });
 
