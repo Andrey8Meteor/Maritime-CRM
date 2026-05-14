@@ -84,6 +84,12 @@ class VesselType(str, Enum):
     PASSENGER = "passenger"
     GENERAL_CARGO = "general_cargo"
 
+class ContainerStatus(str, Enum):
+    EMPTY = "empty"
+    LOADED = "loaded"
+    IN_TRANSIT = "in_transit"
+    DELIVERED = "delivered"
+
 # Pydantic Models
 class UserCreate(BaseModel):
     email: EmailStr
@@ -257,6 +263,37 @@ class PipelineUpdate(BaseModel):
     stage: Optional[PipelineStage] = None
     interview_link: Optional[str] = None
     notes: Optional[str] = None
+
+# Container Models
+class ContainerStatus(str, Enum):
+    EMPTY = "empty"
+    LOADED = "loaded"
+    IN_TRANSIT = "in_transit"
+    DELIVERED = "delivered"
+
+class ContainerBase(BaseModel):
+    number: str
+    size_ft: int = Field(..., ge=10, le=60)
+    type: str
+    weight_kg: float
+    status: ContainerStatus = ContainerStatus.EMPTY
+
+class ContainerCreate(ContainerBase):
+    pass
+
+class ContainerUpdate(BaseModel):
+    number: Optional[str] = None
+    size_ft: Optional[int] = None
+    type: Optional[str] = None
+    weight_kg: Optional[float] = None
+    status: Optional[ContainerStatus] = None
+
+class ContainerInDB(ContainerBase):
+    id: str = Field(alias="_id")
+
+    class Config:
+        arbitrary_types_allowed = True
+        json_encoders = {ObjectId: str}
 
 # Helper functions
 def serialize_doc(doc: dict) -> dict:
@@ -1284,6 +1321,69 @@ async def seed_demo_data():
             "manager": {"email": "manager@maritimecrm.com", "password": "manager123"}
         }
     }
+
+# ========== Container CRUD ==========
+def get_container_by_id(container_id: str):
+    try:
+        obj_id = ObjectId(container_id)
+    except:
+        return None
+    return db.containers.find_one({"_id": obj_id})
+
+def get_all_containers(skip: int = 0, limit: int = 100):
+    return list(db.containers.find().skip(skip).limit(limit))
+
+def create_container(container_data: ContainerCreate) -> dict:
+    container_dict = container_data.dict()
+    result = db.containers.insert_one(container_dict)
+    return db.containers.find_one({"_id": result.inserted_id})
+
+def update_container(container_id: str, container_data: ContainerUpdate) -> dict:
+    update_data = {k: v for k, v in container_data.dict().items() if v is not None}
+    if not update_data:
+        return get_container_by_id(container_id)
+    try:
+        obj_id = ObjectId(container_id)
+    except:
+        return None
+    db.containers.update_one({"_id": obj_id}, {"$set": update_data})
+    return get_container_by_id(container_id)
+
+def delete_container(container_id: str) -> bool:
+    try:
+        obj_id = ObjectId(container_id)
+    except:
+        return False
+    result = db.containers.delete_one({"_id": obj_id})
+    return result.deleted_count > 0
+
+# ========== Container Endpoints ==========
+@app.get("/api/containers", response_model=List[ContainerInDB])
+def read_containers(skip: int = 0, limit: int = 100):
+    return get_all_containers(skip, limit)
+
+@app.get("/api/containers/{container_id}", response_model=ContainerInDB)
+def read_container(container_id: str):
+    container = get_container_by_id(container_id)
+    if not container:
+        raise HTTPException(status_code=404, detail="Container not found")
+    return container
+
+@app.post("/api/containers", response_model=ContainerInDB, status_code=201)
+def create_new_container(container_data: ContainerCreate):
+    return create_container(container_data)
+
+@app.put("/api/containers/{container_id}", response_model=ContainerInDB)
+def update_existing_container(container_id: str, container_data: ContainerUpdate):
+    updated = update_container(container_id, container_data)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Container not found")
+    return updated
+
+@app.delete("/api/containers/{container_id}", status_code=204)
+def delete_existing_container(container_id: str):
+    if not delete_container(container_id):
+        raise HTTPException(status_code=404, detail="Container not found")
 
 if __name__ == "__main__":
     import uvicorn
