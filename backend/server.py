@@ -84,6 +84,18 @@ class VesselType(str, Enum):
     PASSENGER = "passenger"
     GENERAL_CARGO = "general_cargo"
 
+# Task statuses
+class TaskStatus(str, Enum):
+    TODO = "todo"
+    IN_PROGRESS = "in_progress"
+    DONE = "done"
+
+# Project statuses
+class ProjectStatus(str, Enum):
+    ACTIVE = "active"
+    COMPLETED = "completed"
+    ON_HOLD = "on_hold"
+
 # Pydantic Models
 class UserCreate(BaseModel):
     email: EmailStr
@@ -258,6 +270,89 @@ class PipelineUpdate(BaseModel):
     interview_link: Optional[str] = None
     notes: Optional[str] = None
 
+    # ========== CRM Models ==========
+class ClientBase(BaseModel):
+    name: str
+    email: EmailStr
+    phone: Optional[str] = None
+    company: Optional[str] = None
+    notes: Optional[str] = None
+
+class ClientCreate(ClientBase):
+    pass
+
+class ClientUpdate(BaseModel):
+    name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+    company: Optional[str] = None
+    notes: Optional[str] = None
+
+class ClientInDB(ClientBase):
+    id: str = Field(alias="_id")
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    class Config:
+        arbitrary_types_allowed = True
+        json_encoders = {ObjectId: str}
+
+class ProjectBase(BaseModel):
+    name: str
+    client_id: str
+    description: Optional[str] = None
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+    status: ProjectStatus = ProjectStatus.ACTIVE
+
+class ProjectCreate(ProjectBase):
+    pass
+
+class ProjectUpdate(BaseModel):
+    name: Optional[str] = None
+    client_id: Optional[str] = None
+    description: Optional[str] = None
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+    status: Optional[ProjectStatus] = None
+
+class ProjectInDB(ProjectBase):
+    id: str = Field(alias="_id")
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    class Config:
+        arbitrary_types_allowed = True
+        json_encoders = {ObjectId: str}
+
+class TaskBase(BaseModel):
+    title: str
+    description: Optional[str] = None
+    project_id: str
+    assignee_id: Optional[str] = None
+    status: TaskStatus = TaskStatus.TODO
+    due_date: Optional[datetime] = None
+
+class TaskCreate(TaskBase):
+    pass
+
+class TaskUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    project_id: Optional[str] = None
+    assignee_id: Optional[str] = None
+    status: Optional[TaskStatus] = None
+    due_date: Optional[datetime] = None
+
+class TaskInDB(TaskBase):
+    id: str = Field(alias="_id")
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    class Config:
+        arbitrary_types_allowed = True
+        json_encoders = {ObjectId: str}
+
 # Helper functions
 def serialize_doc(doc: dict) -> dict:
     """Recursively serialize MongoDB document, converting ObjectId to str"""
@@ -332,6 +427,139 @@ def send_email_notification(to_email: str, subject: str, html_content: str):
     except Exception as e:
         print(f"Email error: {e}")
         return False
+
+# ========== CRM CRUD Functions ==========
+def get_client_by_id(client_id: str):
+    try:
+        obj_id = ObjectId(client_id)
+    except:
+        return None
+    return db.clients.find_one({"_id": obj_id})
+
+def get_all_clients(skip: int = 0, limit: int = 100):
+    return list(db.clients.find().skip(skip).limit(limit))
+
+def create_client(client_data: ClientCreate) -> dict:
+    client_dict = client_data.dict()
+    client_dict["created_at"] = datetime.now(timezone.utc)
+    client_dict["updated_at"] = datetime.now(timezone.utc)
+    result = db.clients.insert_one(client_dict)
+    return db.clients.find_one({"_id": result.inserted_id})
+
+def update_client(client_id: str, client_data: ClientUpdate) -> dict:
+    update_data = {k: v for k, v in client_data.dict().items() if v is not None}
+    if not update_data:
+        return get_client_by_id(client_id)
+    update_data["updated_at"] = datetime.now(timezone.utc)
+    try:
+        obj_id = ObjectId(client_id)
+    except:
+        return None
+    db.clients.update_one({"_id": obj_id}, {"$set": update_data})
+    return get_client_by_id(client_id)
+
+def delete_client(client_id: str) -> bool:
+    try:
+        obj_id = ObjectId(client_id)
+    except:
+        return False
+    result = db.clients.delete_one({"_id": obj_id})
+    return result.deleted_count > 0
+
+def get_project_by_id(project_id: str):
+    try:
+        obj_id = ObjectId(project_id)
+    except:
+        return None
+    return db.projects.find_one({"_id": obj_id})
+
+def get_all_projects(skip: int = 0, limit: int = 100):
+    return list(db.projects.find().skip(skip).limit(limit))
+
+def create_project(project_data: ProjectCreate) -> dict:
+    project_dict = project_data.dict()
+    project_dict["created_at"] = datetime.now(timezone.utc)
+    project_dict["updated_at"] = datetime.now(timezone.utc)
+    if not get_client_by_id(project_dict["client_id"]):
+        return None
+    result = db.projects.insert_one(project_dict)
+    return db.projects.find_one({"_id": result.inserted_id})
+
+def update_project(project_id: str, project_data: ProjectUpdate) -> dict:
+    update_data = {k: v for k, v in project_data.dict().items() if v is not None}
+    if not update_data:
+        return get_project_by_id(project_id)
+    update_data["updated_at"] = datetime.now(timezone.utc)
+    try:
+        obj_id = ObjectId(project_id)
+    except:
+        return None
+    db.projects.update_one({"_id": obj_id}, {"$set": update_data})
+    return get_project_by_id(project_id)
+
+def delete_project(project_id: str) -> bool:
+    try:
+        obj_id = ObjectId(project_id)
+    except:
+        return False
+    result = db.projects.delete_one({"_id": obj_id})
+    return result.deleted_count > 0
+
+def get_task_by_id(task_id: str):
+    try:
+        obj_id = ObjectId(task_id)
+    except:
+        return None
+    return db.tasks.find_one({"_id": obj_id})
+
+def get_all_tasks(skip: int = 0, limit: int = 100, filters: dict = None):
+    if filters is None:
+        filters = {}
+    cursor = db.tasks.find(filters).skip(skip).limit(limit)
+    return list(cursor)
+
+def create_task(task_data: TaskCreate) -> dict:
+    task_dict = task_data.dict()
+    task_dict["created_at"] = datetime.now(timezone.utc)
+    task_dict["updated_at"] = datetime.now(timezone.utc)
+    if not get_project_by_id(task_dict["project_id"]):
+        return None
+    if task_dict.get("assignee_id"):
+        try:
+            if not db.users.find_one({"_id": ObjectId(task_dict["assignee_id"])}):
+                return None
+        except:
+            return None
+    result = db.tasks.insert_one(task_dict)
+    return db.tasks.find_one({"_id": result.inserted_id})
+
+def update_task(task_id: str, task_data: TaskUpdate) -> dict:
+    update_data = {k: v for k, v in task_data.dict().items() if v is not None}
+    if not update_data:
+        return get_task_by_id(task_id)
+    update_data["updated_at"] = datetime.now(timezone.utc)
+    try:
+        obj_id = ObjectId(task_id)
+    except:
+        return None
+    db.tasks.update_one({"_id": obj_id}, {"$set": update_data})
+    return get_task_by_id(task_id)
+
+def delete_task(task_id: str) -> bool:
+    try:
+        obj_id = ObjectId(task_id)
+    except:
+        return False
+    result = db.tasks.delete_one({"_id": obj_id})
+    return result.deleted_count > 0
+
+def patch_task_status(task_id: str, status: TaskStatus) -> dict:
+    try:
+        obj_id = ObjectId(task_id)
+    except:
+        return None
+    db.tasks.update_one({"_id": obj_id}, {"$set": {"status": status, "updated_at": datetime.now(timezone.utc)}})
+    return get_task_by_id(task_id)
 
 # Auth endpoints
 @app.post("/api/auth/register", response_model=TokenResponse)
@@ -1284,6 +1512,115 @@ async def seed_demo_data():
             "manager": {"email": "manager@maritimecrm.com", "password": "manager123"}
         }
     }
+
+# ========== CRM Endpoints ==========
+@app.get("/api/clients", response_model=List[ClientInDB])
+def read_clients(skip: int = 0, limit: int = 100, current_user: dict = Depends(get_current_user)):
+    return get_all_clients(skip, limit)
+
+@app.get("/api/clients/{client_id}", response_model=ClientInDB)
+def read_client(client_id: str, current_user: dict = Depends(get_current_user)):
+    client = get_client_by_id(client_id)
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    return client
+
+@app.post("/api/clients", response_model=ClientInDB, status_code=201)
+def create_new_client(client_data: ClientCreate, current_user: dict = Depends(get_current_user)):
+    return create_client(client_data)
+
+@app.put("/api/clients/{client_id}", response_model=ClientInDB)
+def update_existing_client(client_id: str, client_data: ClientUpdate, current_user: dict = Depends(get_current_user)):
+    updated = update_client(client_id, client_data)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Client not found")
+    return updated
+
+@app.delete("/api/clients/{client_id}", status_code=204)
+def delete_existing_client(client_id: str, current_user: dict = Depends(get_current_user)):
+    if not delete_client(client_id):
+        raise HTTPException(status_code=404, detail="Client not found")
+
+@app.get("/api/projects", response_model=List[ProjectInDB])
+def read_projects(skip: int = 0, limit: int = 100, current_user: dict = Depends(get_current_user)):
+    return get_all_projects(skip, limit)
+
+@app.get("/api/projects/{project_id}", response_model=ProjectInDB)
+def read_project(project_id: str, current_user: dict = Depends(get_current_user)):
+    project = get_project_by_id(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return project
+
+@app.post("/api/projects", response_model=ProjectInDB, status_code=201)
+def create_new_project(project_data: ProjectCreate, current_user: dict = Depends(get_current_user)):
+    project = create_project(project_data)
+    if not project:
+        raise HTTPException(status_code=400, detail="Client not found or invalid data")
+    return project
+
+@app.put("/api/projects/{project_id}", response_model=ProjectInDB)
+def update_existing_project(project_id: str, project_data: ProjectUpdate, current_user: dict = Depends(get_current_user)):
+    updated = update_project(project_id, project_data)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return updated
+
+@app.delete("/api/projects/{project_id}", status_code=204)
+def delete_existing_project(project_id: str, current_user: dict = Depends(get_current_user)):
+    if not delete_project(project_id):
+        raise HTTPException(status_code=404, detail="Project not found")
+
+@app.get("/api/tasks", response_model=List[TaskInDB])
+def read_tasks(
+    skip: int = 0,
+    limit: int = 100,
+    status: Optional[TaskStatus] = None,
+    assignee_id: Optional[str] = None,
+    project_id: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    filters = {}
+    if status:
+        filters["status"] = status
+    if assignee_id:
+        filters["assignee_id"] = assignee_id
+    if project_id:
+        filters["project_id"] = project_id
+    return get_all_tasks(skip, limit, filters)
+
+@app.get("/api/tasks/{task_id}", response_model=TaskInDB)
+def read_task(task_id: str, current_user: dict = Depends(get_current_user)):
+    task = get_task_by_id(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return task
+
+@app.post("/api/tasks", response_model=TaskInDB, status_code=201)
+def create_new_task(task_data: TaskCreate, current_user: dict = Depends(get_current_user)):
+    task = create_task(task_data)
+    if not task:
+        raise HTTPException(status_code=400, detail="Project or assignee not found")
+    return task
+
+@app.put("/api/tasks/{task_id}", response_model=TaskInDB)
+def update_existing_task(task_id: str, task_data: TaskUpdate, current_user: dict = Depends(get_current_user)):
+    updated = update_task(task_id, task_data)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return updated
+
+@app.patch("/api/tasks/{task_id}/status", response_model=TaskInDB)
+def patch_task_status_endpoint(task_id: str, status: TaskStatus, current_user: dict = Depends(get_current_user)):
+    updated = patch_task_status(task_id, status)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return updated
+
+@app.delete("/api/tasks/{task_id}", status_code=204)
+def delete_existing_task(task_id: str, current_user: dict = Depends(get_current_user)):
+    if not delete_task(task_id):
+        raise HTTPException(status_code=404, detail="Task not found")
 
 if __name__ == "__main__":
     import uvicorn
