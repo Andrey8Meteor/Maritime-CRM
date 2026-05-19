@@ -84,17 +84,20 @@ class VesselType(str, Enum):
     PASSENGER = "passenger"
     GENERAL_CARGO = "general_cargo"
 
+# TaskStatus: статусы для задач в CRM
 # Task statuses
 class TaskStatus(str, Enum):
-    TODO = "todo"
-    IN_PROGRESS = "in_progress"
-    DONE = "done"
+    """Статусы задач в CRM"""
+    TODO = "todo"  # задача только создана, ещё не начата
+    IN_PROGRESS = "in_progress"  # задача в работе
+    DONE = "done"  # задача выполнена
 
-# Project statuses
+# Project statuses: статусы для проектов
 class ProjectStatus(str, Enum):
-    ACTIVE = "active"
-    COMPLETED = "completed"
-    ON_HOLD = "on_hold"
+    """Статусы проектов"""
+    ACTIVE = "active" # проект активен, идёт работа
+    COMPLETED = "completed" # проект завершён
+    ON_HOLD = "on_hold" # проект приостановлен
 
 # Pydantic Models
 class UserCreate(BaseModel):
@@ -272,43 +275,55 @@ class PipelineUpdate(BaseModel):
 
     # ========== CRM Models ==========
 class ClientBase(BaseModel):
-    name: str
-    email: EmailStr
-    phone: Optional[str] = None
-    company: Optional[str] = None
-    notes: Optional[str] = None
+     """Базовая модель клиента - общие поля для всех операций"""
+    name: str # название компании/имя клиента
+    email: EmailStr # email клиента (валидируется как email)
+    phone: Optional[str] = None # телефон (необязательное поле)
+    company: Optional[str] = None # компания (если клиент — физлицо, может быть пусто)
+    notes: Optional[str] = None # заметки/комментарии
 
+# ClientCreate: используется при создании нового клиента (наследует все поля ClientBase)
 class ClientCreate(ClientBase):
-    pass
+     """Модель для создания нового клиента - наследует все поля ClientBase"""
+    pass  # все поля те же, что и в ClientBase
 
+# ClientUpdate: используется при обновлении клиента (все поля необязательные)
 class ClientUpdate(BaseModel):
+    """Модель для обновления клиента - все поля необязательные"""
     name: Optional[str] = None
     email: Optional[EmailStr] = None
     phone: Optional[str] = None
     company: Optional[str] = None
     notes: Optional[str] = None
 
+# ClientInDB: модель клиента при возврате из базы данных
 class ClientInDB(ClientBase):
-    id: str = Field(alias="_id")
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    """Модель клиента при возврате из базы данных - добавляет служебные поля"""
+    id: str = Field(alias="_id")  # MongoDB ObjectId преобразованный в строку
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc)) # дата создания
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc)) # дата обновления
 
     class Config:
-        arbitrary_types_allowed = True
-        json_encoders = {ObjectId: str}
+        arbitrary_types_allowed = True # разрешаем использовать типы, не являющиеся стандартными Pydantic
+        json_encoders = {ObjectId: str} # как преобразовывать ObjectId в JSON
 
+# ---------- МОДЕЛИ ДЛЯ ПРОЕКТОВ (PROJECT) ----------
+# ProjectBase: базовая модель проекта
 class ProjectBase(BaseModel):
-    name: str
-    client_id: str
-    description: Optional[str] = None
-    start_date: Optional[datetime] = None
-    end_date: Optional[datetime] = None
-    status: ProjectStatus = ProjectStatus.ACTIVE
+     """Базовая модель проекта"""
+    name: str   # название проекта
+    client_id: str # ID клиента, к которому привязан проект (внешний ключ)
+    description: Optional[str] = None # описание проекта
+    start_date: Optional[datetime] = None # дата начала проекта
+    end_date: Optional[datetime] = None # дата окончания проекта
+    status: ProjectStatus = ProjectStatus.ACTIVE # статус проекта (по умолчанию ACTIVE)
 
 class ProjectCreate(ProjectBase):
-    pass
+      """Модель для создания нового проекта"""
+    pass  # используется при создании проекта
 
 class ProjectUpdate(BaseModel):
+     """Модель для обновления проекта - все поля необязательные"""
     name: Optional[str] = None
     client_id: Optional[str] = None
     description: Optional[str] = None
@@ -317,6 +332,7 @@ class ProjectUpdate(BaseModel):
     status: Optional[ProjectStatus] = None
 
 class ProjectInDB(ProjectBase):
+    """Модель проекта для возврата из БД"""
     id: str = Field(alias="_id")
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -325,18 +341,23 @@ class ProjectInDB(ProjectBase):
         arbitrary_types_allowed = True
         json_encoders = {ObjectId: str}
 
+# ---------- МОДЕЛИ ДЛЯ ЗАДАЧ (TASK) ----------
+# TaskBase: базовая модель задачи
 class TaskBase(BaseModel):
-    title: str
-    description: Optional[str] = None
-    project_id: str
-    assignee_id: Optional[str] = None
-    status: TaskStatus = TaskStatus.TODO
-    due_date: Optional[datetime] = None
+    """Базовая модель задачи"""
+    title: str  # заголовок/название задачи
+    description: Optional[str] = None  # подробное описание задачи
+    project_id: str # ID проекта, к которому привязана задача
+    assignee_id: Optional[str] = None # ID исполнителя (пользователя системы)
+    status: TaskStatus = TaskStatus.TODO # статус задачи (по умолчанию TODO)
+    due_date: Optional[datetime] = None # срок выполнения
 
 class TaskCreate(TaskBase):
+    """Модель для создания новой задачи"""
     pass
 
 class TaskUpdate(BaseModel):
+    """Модель для обновления задачи"""
     title: Optional[str] = None
     description: Optional[str] = None
     project_id: Optional[str] = None
@@ -345,6 +366,7 @@ class TaskUpdate(BaseModel):
     due_date: Optional[datetime] = None
 
 class TaskInDB(TaskBase):
+    """Модель задачи для возврата из БД"""
     id: str = Field(alias="_id")
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -428,45 +450,60 @@ def send_email_notification(to_email: str, subject: str, html_content: str):
         print(f"Email error: {e}")
         return False
 
-# ========== CRM CRUD Functions ==========
+# ===================================================================
+# CRUD ФУНКЦИИ ДЛЯ РАБОТЫ С БАЗОЙ ДАННЫХ
+# Эти функции выполняют прямые операции с MongoDB
+# ===================================================================
+
+# ---------- CRUD ДЛЯ КЛИЕНТОВ ----------
 def get_client_by_id(client_id: str):
-    try:
-        obj_id = ObjectId(client_id)
+    """Найти клиента по ID в базе данных"""
+    try: 
+        obj_id = ObjectId(client_id) # преобразуем строку ID в ObjectId MongoDB
     except:
-        return None
-    return db.clients.find_one({"_id": obj_id})
+        return None # если ID некорректный, возвращаем None
+    return db.clients.find_one({"_id": obj_id}) # ищем документ в коллекции clients 
 
 def get_all_clients(skip: int = 0, limit: int = 100):
-    return list(db.clients.find().skip(skip).limit(limit))
+    """Получить список всех клиентов с пагинацией (пропустить skip, взять limit)"""
+    return list(db.clients.find().skip(skip).limit(limit)) # пропускаем skip записей, берём limit записей
 
 def create_client(client_data: ClientCreate) -> dict:
-    client_dict = client_data.dict()
+    """Создать нового клиента в базе данных"""
+    client_dict = client_data.dict() # преобразуем Pydantic-модель в словарь
+ # добавляем временные метки
     client_dict["created_at"] = datetime.now(timezone.utc)
     client_dict["updated_at"] = datetime.now(timezone.utc)
-    result = db.clients.insert_one(client_dict)
-    return db.clients.find_one({"_id": result.inserted_id})
+    result = db.clients.insert_one(client_dict) # вставляем документ в коллекцию
+    return db.clients.find_one({"_id": result.inserted_id})  # возвращаем созданный документ с _id
 
 def update_client(client_id: str, client_data: ClientUpdate) -> dict:
+    """Обновить данные существующего клиента"""
+# собираем только те поля, которые были переданы (не None)
     update_data = {k: v for k, v in client_data.dict().items() if v is not None}
     if not update_data:
-        return get_client_by_id(client_id)
-    update_data["updated_at"] = datetime.now(timezone.utc)
+        return get_client_by_id(client_id) # если нет данных для обновления, просто возвращаем клиента
+    update_data["updated_at"] = datetime.now(timezone.utc) # обновляем временную метку
     try:
         obj_id = ObjectId(client_id)
     except:
         return None
+# выполняем обновление в MongoDB
     db.clients.update_one({"_id": obj_id}, {"$set": update_data})
-    return get_client_by_id(client_id)
+    return get_client_by_id(client_id)  # возвращаем обновлённого клиента
 
 def delete_client(client_id: str) -> bool:
+     """Удалить клиента из базы данных"""
     try:
         obj_id = ObjectId(client_id)
     except:
         return False
-    result = db.clients.delete_one({"_id": obj_id})
-    return result.deleted_count > 0
+    result = db.clients.delete_one({"_id": obj_id}) # удаляем документ
+    return result.deleted_count > 0 # возвращаем True, если удаление произошло
 
+# ---------- CRUD ДЛЯ ПРОЕКТОВ ----------
 def get_project_by_id(project_id: str):
+    """Найти проект по ID"""
     try:
         obj_id = ObjectId(project_id)
     except:
@@ -474,18 +511,22 @@ def get_project_by_id(project_id: str):
     return db.projects.find_one({"_id": obj_id})
 
 def get_all_projects(skip: int = 0, limit: int = 100):
+    """Получить список всех проектов с пагинацией"""
     return list(db.projects.find().skip(skip).limit(limit))
 
 def create_project(project_data: ProjectCreate) -> dict:
+     """Создать новый проект с проверкой существования клиента"""
     project_dict = project_data.dict()
     project_dict["created_at"] = datetime.now(timezone.utc)
     project_dict["updated_at"] = datetime.now(timezone.utc)
+ # ВАЖНО: проверяем, существует ли клиент с таким ID
     if not get_client_by_id(project_dict["client_id"]):
-        return None
+        return None  # если клиент не найден, возвращаем None (ошибка)
     result = db.projects.insert_one(project_dict)
     return db.projects.find_one({"_id": result.inserted_id})
 
 def update_project(project_id: str, project_data: ProjectUpdate) -> dict:
+     """Обновить данные проекта"""
     update_data = {k: v for k, v in project_data.dict().items() if v is not None}
     if not update_data:
         return get_project_by_id(project_id)
@@ -498,6 +539,7 @@ def update_project(project_id: str, project_data: ProjectUpdate) -> dict:
     return get_project_by_id(project_id)
 
 def delete_project(project_id: str) -> bool:
+    """Удалить проект"""
     try:
         obj_id = ObjectId(project_id)
     except:
@@ -505,7 +547,9 @@ def delete_project(project_id: str) -> bool:
     result = db.projects.delete_one({"_id": obj_id})
     return result.deleted_count > 0
 
+# CRUD ФУНКЦИИ ДЛЯ ЗАДАЧ (Task CRUD)
 def get_task_by_id(task_id: str):
+     """Найти задачу по ID"""
     try:
         obj_id = ObjectId(task_id)
     except:
@@ -513,17 +557,22 @@ def get_task_by_id(task_id: str):
     return db.tasks.find_one({"_id": obj_id})
 
 def get_all_tasks(skip: int = 0, limit: int = 100, filters: dict = None):
+    """Получить список задач с пагинацией и фильтрацией filters - словарь с условиями поиска (например {"status": "todo"})"""
     if filters is None:
-        filters = {}
+        filters = {} 
+# cursor — итератор по результатам запроса
     cursor = db.tasks.find(filters).skip(skip).limit(limit)
-    return list(cursor)
+    return list(cursor) # преобразуем курсор в список
 
 def create_task(task_data: TaskCreate) -> dict:
+     """Создать новую задачу с проверкой существования проекта и исполнителя"""
     task_dict = task_data.dict()
     task_dict["created_at"] = datetime.now(timezone.utc)
     task_dict["updated_at"] = datetime.now(timezone.utc)
+# проверяем существование проекта
     if not get_project_by_id(task_dict["project_id"]):
         return None
+ # проверяем существование исполнителя (если указан)
     if task_dict.get("assignee_id"):
         try:
             if not db.users.find_one({"_id": ObjectId(task_dict["assignee_id"])}):
@@ -534,6 +583,7 @@ def create_task(task_data: TaskCreate) -> dict:
     return db.tasks.find_one({"_id": result.inserted_id})
 
 def update_task(task_id: str, task_data: TaskUpdate) -> dict:
+    """Обновить данные задачи"""
     update_data = {k: v for k, v in task_data.dict().items() if v is not None}
     if not update_data:
         return get_task_by_id(task_id)
@@ -546,6 +596,7 @@ def update_task(task_id: str, task_data: TaskUpdate) -> dict:
     return get_task_by_id(task_id)
 
 def delete_task(task_id: str) -> bool:
+    """Удалить задачу"""
     try:
         obj_id = ObjectId(task_id)
     except:
@@ -554,10 +605,12 @@ def delete_task(task_id: str) -> bool:
     return result.deleted_count > 0
 
 def patch_task_status(task_id: str, status: TaskStatus) -> dict:
+    """Изменить только статус задачи (без обновления других полей)"""
     try:
         obj_id = ObjectId(task_id)
     except:
-        return None
+        return None 
+ # обновляем только поле status и временную метку
     db.tasks.update_one({"_id": obj_id}, {"$set": {"status": status, "updated_at": datetime.now(timezone.utc)}})
     return get_task_by_id(task_id)
 
@@ -1513,13 +1566,21 @@ async def seed_demo_data():
         }
     }
 
+# ===================================================================
+# API ЭНДПОИНТЫ (REST API МАРШРУТЫ)
+# Эти функции обрабатывают HTTP-запросы к вашему API
+# Каждый эндпоинт выполняет определённую операцию CRUD
+# ===================================================================
+
 # ========== CRM Endpoints ==========
 @app.get("/api/clients", response_model=List[ClientInDB])
 def read_clients(skip: int = 0, limit: int = 100, current_user: dict = Depends(get_current_user)):
+    """GET /api/clients Возвращает список всех клиентов с пагинацией. Требуется авторизация (JWT токен)."""
     return get_all_clients(skip, limit)
 
 @app.get("/api/clients/{client_id}", response_model=ClientInDB)
 def read_client(client_id: str, current_user: dict = Depends(get_current_user)):
+    """GET /api/clients/{client_id} Возвращает одного клиента по его ID. Если клиент не найден - ошибка 404."""
     client = get_client_by_id(client_id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
@@ -1527,10 +1588,12 @@ def read_client(client_id: str, current_user: dict = Depends(get_current_user)):
 
 @app.post("/api/clients", response_model=ClientInDB, status_code=201)
 def create_new_client(client_data: ClientCreate, current_user: dict = Depends(get_current_user)):
+     """POST /api/clients Создаёт нового клиента из данных в теле запроса. Возвращает созданного клиента с присвоенным ID.""" 
     return create_client(client_data)
 
 @app.put("/api/clients/{client_id}", response_model=ClientInDB)
 def update_existing_client(client_id: str, client_data: ClientUpdate, current_user: dict = Depends(get_current_user)):
+    """PUT /api/clients/{client_id} Полностью обновляет данные клиента. Возвращает обновлённого клиента."""
     updated = update_client(client_id, client_data)
     if not updated:
         raise HTTPException(status_code=404, detail="Client not found")
@@ -1538,15 +1601,18 @@ def update_existing_client(client_id: str, client_data: ClientUpdate, current_us
 
 @app.delete("/api/clients/{client_id}", status_code=204)
 def delete_existing_client(client_id: str, current_user: dict = Depends(get_current_user)):
+    """DELETE /api/clients/{client_id} Удаляет клиента. При успехе возвращает статус 204 (без тела)."""
     if not delete_client(client_id):
         raise HTTPException(status_code=404, detail="Client not found")
-
+# ---------- ЭНДПОИНТЫ ДЛЯ ПРОЕКТОВ ----------
 @app.get("/api/projects", response_model=List[ProjectInDB])
 def read_projects(skip: int = 0, limit: int = 100, current_user: dict = Depends(get_current_user)):
+    """GET /api/projects - список всех проектов"""
     return get_all_projects(skip, limit)
 
 @app.get("/api/projects/{project_id}", response_model=ProjectInDB)
 def read_project(project_id: str, current_user: dict = Depends(get_current_user)):
+     """GET /api/projects/{project_id} - один проект по ID"""
     project = get_project_by_id(project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -1554,6 +1620,7 @@ def read_project(project_id: str, current_user: dict = Depends(get_current_user)
 
 @app.post("/api/projects", response_model=ProjectInDB, status_code=201)
 def create_new_project(project_data: ProjectCreate, current_user: dict = Depends(get_current_user)):
+    """POST /api/projects Создаёт новый проект. Предварительно проверяет, что клиент существует."""
     project = create_project(project_data)
     if not project:
         raise HTTPException(status_code=400, detail="Client not found or invalid data")
@@ -1561,6 +1628,7 @@ def create_new_project(project_data: ProjectCreate, current_user: dict = Depends
 
 @app.put("/api/projects/{project_id}", response_model=ProjectInDB)
 def update_existing_project(project_id: str, project_data: ProjectUpdate, current_user: dict = Depends(get_current_user)):
+    """PUT /api/projects/{project_id} - обновляет проект"""
     updated = update_project(project_id, project_data)
     if not updated:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -1568,9 +1636,10 @@ def update_existing_project(project_id: str, project_data: ProjectUpdate, curren
 
 @app.delete("/api/projects/{project_id}", status_code=204)
 def delete_existing_project(project_id: str, current_user: dict = Depends(get_current_user)):
+    """DELETE /api/projects/{project_id} - удаляет проект"""
     if not delete_project(project_id):
         raise HTTPException(status_code=404, detail="Project not found")
-
+# ---------- ЭНДПОИНТЫ ДЛЯ ЗАДАЧ ----------
 @app.get("/api/tasks", response_model=List[TaskInDB])
 def read_tasks(
     skip: int = 0,
@@ -1580,6 +1649,12 @@ def read_tasks(
     project_id: Optional[str] = None,
     current_user: dict = Depends(get_current_user)
 ):
+     """
+    GET /api/tasks Возвращает список задач с фильтрацией и пагинацией. Параметры фильтрации (все необязательные):
+    - status: статус задачи (todo, in_progress, done)
+    - assignee_id: ID исполнителя
+    - project_id: ID проекта
+    """
     filters = {}
     if status:
         filters["status"] = status
@@ -1591,6 +1666,7 @@ def read_tasks(
 
 @app.get("/api/tasks/{task_id}", response_model=TaskInDB)
 def read_task(task_id: str, current_user: dict = Depends(get_current_user)):
+    """GET /api/tasks/{task_id} - одна задача по ID"""
     task = get_task_by_id(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -1598,6 +1674,7 @@ def read_task(task_id: str, current_user: dict = Depends(get_current_user)):
 
 @app.post("/api/tasks", response_model=TaskInDB, status_code=201)
 def create_new_task(task_data: TaskCreate, current_user: dict = Depends(get_current_user)):
+    """POST /api/tasks Создаёт новую задачу. Проверяет существование проекта и исполнителя."""
     task = create_task(task_data)
     if not task:
         raise HTTPException(status_code=400, detail="Project or assignee not found")
@@ -1605,6 +1682,7 @@ def create_new_task(task_data: TaskCreate, current_user: dict = Depends(get_curr
 
 @app.put("/api/tasks/{task_id}", response_model=TaskInDB)
 def update_existing_task(task_id: str, task_data: TaskUpdate, current_user: dict = Depends(get_current_user)):
+     """PUT /api/tasks/{task_id} - обновляет задачу"""
     updated = update_task(task_id, task_data)
     if not updated:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -1612,6 +1690,7 @@ def update_existing_task(task_id: str, task_data: TaskUpdate, current_user: dict
 
 @app.patch("/api/tasks/{task_id}/status", response_model=TaskInDB)
 def patch_task_status_endpoint(task_id: str, status: TaskStatus, current_user: dict = Depends(get_current_user)):
+    """PATCH /api/tasks/{task_id}/status Специальный эндпоинт для изменения ТОЛЬКО статуса задачи. Пример запроса: PATCH /api/tasks/123/status с телом {"status": "done"}"""
     updated = patch_task_status(task_id, status)
     if not updated:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -1619,6 +1698,7 @@ def patch_task_status_endpoint(task_id: str, status: TaskStatus, current_user: d
 
 @app.delete("/api/tasks/{task_id}", status_code=204)
 def delete_existing_task(task_id: str, current_user: dict = Depends(get_current_user)):
+    """DELETE /api/tasks/{task_id} - удаляет задачу"""
     if not delete_task(task_id):
         raise HTTPException(status_code=404, detail="Task not found")
 
