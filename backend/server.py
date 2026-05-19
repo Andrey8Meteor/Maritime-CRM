@@ -84,8 +84,11 @@ class VesselType(str, Enum):
     PASSENGER = "passenger"
     GENERAL_CARGO = "general_cargo"
 
-# TaskStatus: статусы для задач в CRM
-# Task statuses
+# БЛОК 1: ПЕРЕЧИСЛЕНИЯ (ENUM) ДЛЯ СТАТУСОВ ЗАДАЧ И ПРОЕКТОВ
+# ============================================================================
+# Эти классы определяют возможные статусы для задач и проектов.
+# Они нужны, чтобы ограничить допустимые значения и избежать ошибок.
+
 class TaskStatus(str, Enum):
     """Статусы задач в CRM"""
     TODO = "todo"  # задача только создана, ещё не начата
@@ -273,7 +276,10 @@ class PipelineUpdate(BaseModel):
     interview_link: Optional[str] = None
     notes: Optional[str] = None
 
-    # ========== CRM Models ==========
+# БЛОК 2: МОДЕЛИ КЛИЕНТОВ (Client Models)
+# ============================================================================
+# Эти классы описывают структуру данных для клиентов.
+# Они используются для валидации входящих данных и форматирования ответов.
 class ClientBase(BaseModel):
      """Базовая модель клиента - общие поля для всех операций"""
     name: str # название компании/имя клиента
@@ -309,6 +315,7 @@ class ClientInDB(ClientBase):
 
 # ---------- МОДЕЛИ ДЛЯ ПРОЕКТОВ (PROJECT) ----------
 # ProjectBase: базовая модель проекта
+# Проекты привязаны к клиентам (внешний ключ client_id)
 class ProjectBase(BaseModel):
      """Базовая модель проекта"""
     name: str   # название проекта
@@ -342,7 +349,7 @@ class ProjectInDB(ProjectBase):
         json_encoders = {ObjectId: str}
 
 # ---------- МОДЕЛИ ДЛЯ ЗАДАЧ (TASK) ----------
-# TaskBase: базовая модель задачи
+# Задачи привязаны к проектам (project_id) и могут иметь исполнителя (assignee_id)
 class TaskBase(BaseModel):
     """Базовая модель задачи"""
     title: str  # заголовок/название задачи
@@ -451,7 +458,7 @@ def send_email_notification(to_email: str, subject: str, html_content: str):
         return False
 
 # ===================================================================
-# CRUD ФУНКЦИИ ДЛЯ РАБОТЫ С БАЗОЙ ДАННЫХ
+# CRUD ФУНКЦИИ ДЛЯ КЛИЕНТОВ (Client CRUD)
 # Эти функции выполняют прямые операции с MongoDB
 # ===================================================================
 
@@ -472,8 +479,8 @@ def create_client(client_data: ClientCreate) -> dict:
     """Создать нового клиента в базе данных"""
     client_dict = client_data.dict() # преобразуем Pydantic-модель в словарь
  # добавляем временные метки
-    client_dict["created_at"] = datetime.now(timezone.utc)
-    client_dict["updated_at"] = datetime.now(timezone.utc)
+    client_dict["created_at"] = datetime.now(timezone.utc) # Добавляем дату создания
+    client_dict["updated_at"] = datetime.now(timezone.utc) # Добавляем дату обновоения
     result = db.clients.insert_one(client_dict) # вставляем документ в коллекцию
     return db.clients.find_one({"_id": result.inserted_id})  # возвращаем созданный документ с _id
 
@@ -483,13 +490,13 @@ def update_client(client_id: str, client_data: ClientUpdate) -> dict:
     update_data = {k: v for k, v in client_data.dict().items() if v is not None}
     if not update_data:
         return get_client_by_id(client_id) # если нет данных для обновления, просто возвращаем клиента
-    update_data["updated_at"] = datetime.now(timezone.utc) # обновляем временную метку
+    update_data["updated_at"] = datetime.now(timezone.utc) #  Обновляем дату изменения
     try:
         obj_id = ObjectId(client_id)
     except:
         return None
 # выполняем обновление в MongoDB
-    db.clients.update_one({"_id": obj_id}, {"$set": update_data})
+    db.clients.update_one({"_id": obj_id}, {"$set": update_data}) #Обновляем 
     return get_client_by_id(client_id)  # возвращаем обновлённого клиента
 
 def delete_client(client_id: str) -> bool:
@@ -501,19 +508,19 @@ def delete_client(client_id: str) -> bool:
     result = db.clients.delete_one({"_id": obj_id}) # удаляем документ
     return result.deleted_count > 0 # возвращаем True, если удаление произошло
 
-# ---------- CRUD ДЛЯ ПРОЕКТОВ ----------
+#  CRUD ФУНКЦИИ ДЛЯ ПРОЕКТОВ (Project CRUD)
+# ============================================================================
 def get_project_by_id(project_id: str):
     """Найти проект по ID"""
     try:
-        obj_id = ObjectId(project_id)
+        obj_id = ObjectId(project_id) # Преобразуем строку в ObjectId MongoDB
     except:
-        return None
-    return db.projects.find_one({"_id": obj_id})
+        return None # Неверный формат ID
+    return db.projects.find_one({"_id": obj_id}) # Ищем и возвращаем документ
 
 def get_all_projects(skip: int = 0, limit: int = 100):
     """Получить список всех проектов с пагинацией"""
     return list(db.projects.find().skip(skip).limit(limit))
-
 def create_project(project_data: ProjectCreate) -> dict:
      """Создать новый проект с проверкой существования клиента"""
     project_dict = project_data.dict()
@@ -547,9 +554,9 @@ def delete_project(project_id: str) -> bool:
     result = db.projects.delete_one({"_id": obj_id})
     return result.deleted_count > 0
 
-# CRUD ФУНКЦИИ ДЛЯ ЗАДАЧ (Task CRUD)
+# СRUD ФУНКЦИИ ДЛЯ ЗАДАЧ (Task CRUD)
 def get_task_by_id(task_id: str):
-     """Найти задачу по ID"""
+     """Найти задачу по ID""" 
     try:
         obj_id = ObjectId(task_id)
     except:
