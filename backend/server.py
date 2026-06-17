@@ -281,7 +281,7 @@ class PipelineUpdate(BaseModel):
 # Эти классы описывают структуру данных для клиентов.
 # Они используются для валидации входящих данных и форматирования ответов.
 class ClientBase(BaseModel):
-     """Базовая модель клиента - общие поля для всех операций"""
+    """Базовая модель клиента - общие поля для всех операций"""
     name: str # название компании/имя клиента
     email: EmailStr # email клиента (валидируется как email)
     phone: Optional[str] = None # телефон (необязательное поле)
@@ -290,7 +290,7 @@ class ClientBase(BaseModel):
 
 # ClientCreate: используется при создании нового клиента (наследует все поля ClientBase)
 class ClientCreate(ClientBase):
-     """Модель для создания нового клиента - наследует все поля ClientBase"""
+    """Модель для создания нового клиента - наследует все поля ClientBase"""
     pass  # все поля те же, что и в ClientBase
 
 # ClientUpdate: используется при обновлении клиента (все поля необязательные)
@@ -302,22 +302,22 @@ class ClientUpdate(BaseModel):
     company: Optional[str] = None
     notes: Optional[str] = None
 
-# ClientInDB: модель клиента при возврате из базы данных
 class ClientInDB(ClientBase):
     """Модель клиента при возврате из базы данных - добавляет служебные поля"""
-    id: str = Field(alias="_id")  # MongoDB ObjectId преобразованный в строку
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc)) # дата создания
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc)) # дата обновления
+    id: str = Field(alias="_id")
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-    class Config:
-        arbitrary_types_allowed = True # разрешаем использовать типы, не являющиеся стандартными Pydantic
-        json_encoders = {ObjectId: str} # как преобразовывать ObjectId в JSON
-
+    model_config = {
+        "arbitrary_types_allowed": True,
+        "json_encoders": {ObjectId: str},
+        "populate_by_name": True
+    }
 # ---------- МОДЕЛИ ДЛЯ ПРОЕКТОВ (PROJECT) ----------
 # ProjectBase: базовая модель проекта
 # Проекты привязаны к клиентам (внешний ключ client_id)
 class ProjectBase(BaseModel):
-     """Базовая модель проекта"""
+    """Базовая модель проекта"""
     name: str   # название проекта
     client_id: str # ID клиента, к которому привязан проект (внешний ключ)
     description: Optional[str] = None # описание проекта
@@ -326,11 +326,11 @@ class ProjectBase(BaseModel):
     status: ProjectStatus = ProjectStatus.ACTIVE # статус проекта (по умолчанию ACTIVE)
 
 class ProjectCreate(ProjectBase):
-      """Модель для создания нового проекта"""
+    """Модель для создания нового проекта"""
     pass  # используется при создании проекта
 
 class ProjectUpdate(BaseModel):
-     """Модель для обновления проекта - все поля необязательные"""
+    """Модель для обновления проекта - все поля необязательные"""
     name: Optional[str] = None
     client_id: Optional[str] = None
     description: Optional[str] = None
@@ -344,10 +344,11 @@ class ProjectInDB(ProjectBase):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-    class Config:
-        arbitrary_types_allowed = True
-        json_encoders = {ObjectId: str}
-
+    model_config = {
+        "arbitrary_types_allowed": True,
+        "json_encoders": {ObjectId: str},
+        "populate_by_name": True
+    }
 # ---------- МОДЕЛИ ДЛЯ ЗАДАЧ (TASK) ----------
 # Задачи привязаны к проектам (project_id) и могут иметь исполнителя (assignee_id)
 class TaskBase(BaseModel):
@@ -378,9 +379,11 @@ class TaskInDB(TaskBase):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-    class Config:
-        arbitrary_types_allowed = True
-        json_encoders = {ObjectId: str}
+    model_config = {
+        "arbitrary_types_allowed": True,
+        "json_encoders": {ObjectId: str},
+        "populate_by_name": True
+    }
 
 # Helper functions
 def serialize_doc(doc: dict) -> dict:
@@ -464,25 +467,32 @@ def send_email_notification(to_email: str, subject: str, html_content: str):
 
 # ---------- CRUD ДЛЯ КЛИЕНТОВ ----------
 def get_client_by_id(client_id: str):
-    """Найти клиента по ID в базе данных"""
-    try: 
-        obj_id = ObjectId(client_id) # преобразуем строку ID в ObjectId MongoDB
+    try:
+        obj_id = ObjectId(client_id)
     except:
-        return None # если ID некорректный, возвращаем None
-    return db.clients.find_one({"_id": obj_id}) # ищем документ в коллекции clients 
+        return None
+    client = db.clients.find_one({"_id": obj_id})
+    if client and "_id" in client:
+        client["_id"] = str(client["_id"])  # ПРЕОБРАЗУЕМ ObjectId В СТРОКУ!
+    return client
 
 def get_all_clients(skip: int = 0, limit: int = 100):
-    """Получить список всех клиентов с пагинацией (пропустить skip, взять limit)"""
-    return list(db.clients.find().skip(skip).limit(limit)) # пропускаем skip записей, берём limit записей
+    clients = list(db.clients.find().skip(skip).limit(limit))
+    for client in clients:
+        if "_id" in client:
+            client["_id"] = str(client["_id"])  # ПРЕОБРАЗУЕМ ObjectId В СТРОКУ!
+    return clients
 
 def create_client(client_data: ClientCreate) -> dict:
     """Создать нового клиента в базе данных"""
-    client_dict = client_data.dict() # преобразуем Pydantic-модель в словарь
- # добавляем временные метки
-    client_dict["created_at"] = datetime.now(timezone.utc) # Добавляем дату создания
-    client_dict["updated_at"] = datetime.now(timezone.utc) # Добавляем дату обновоения
-    result = db.clients.insert_one(client_dict) # вставляем документ в коллекцию
-    return db.clients.find_one({"_id": result.inserted_id})  # возвращаем созданный документ с _id
+    client_dict = client_data.model_dump()  # используем model_dump вместо dict
+    client_dict["created_at"] = datetime.now(timezone.utc)
+    client_dict["updated_at"] = datetime.now(timezone.utc)
+    result = db.clients.insert_one(client_dict)
+    client = db.clients.find_one({"_id": result.inserted_id})
+    if client and "_id" in client:
+        client["_id"] = str(client["_id"])  # ПРЕОБРАЗУЕМ ObjectId В СТРОКУ!
+    return client
 
 def update_client(client_id: str, client_data: ClientUpdate) -> dict:
     """Обновить данные существующего клиента"""
@@ -500,7 +510,7 @@ def update_client(client_id: str, client_data: ClientUpdate) -> dict:
     return get_client_by_id(client_id)  # возвращаем обновлённого клиента
 
 def delete_client(client_id: str) -> bool:
-     """Удалить клиента из базы данных"""
+    """Удалить клиента из базы данных"""
     try:
         obj_id = ObjectId(client_id)
     except:
@@ -511,29 +521,37 @@ def delete_client(client_id: str) -> bool:
 #  CRUD ФУНКЦИИ ДЛЯ ПРОЕКТОВ (Project CRUD)
 # ============================================================================
 def get_project_by_id(project_id: str):
-    """Найти проект по ID"""
     try:
-        obj_id = ObjectId(project_id) # Преобразуем строку в ObjectId MongoDB
+        obj_id = ObjectId(project_id)
     except:
-        return None # Неверный формат ID
-    return db.projects.find_one({"_id": obj_id}) # Ищем и возвращаем документ
+        return None
+    project = db.projects.find_one({"_id": obj_id})
+    if project and "_id" in project:
+        project["_id"] = str(project["_id"])
+    return project
 
 def get_all_projects(skip: int = 0, limit: int = 100):
-    """Получить список всех проектов с пагинацией"""
-    return list(db.projects.find().skip(skip).limit(limit))
+    projects = list(db.projects.find().skip(skip).limit(limit))
+    for project in projects:
+        if "_id" in project:
+            project["_id"] = str(project["_id"])
+    return projects
+
 def create_project(project_data: ProjectCreate) -> dict:
-     """Создать новый проект с проверкой существования клиента"""
-    project_dict = project_data.dict()
+    """Создать новый проект с проверкой существования клиента"""
+    project_dict = project_data.model_dump()  # заменили .dict() на .model_dump()
     project_dict["created_at"] = datetime.now(timezone.utc)
     project_dict["updated_at"] = datetime.now(timezone.utc)
- # ВАЖНО: проверяем, существует ли клиент с таким ID
     if not get_client_by_id(project_dict["client_id"]):
-        return None  # если клиент не найден, возвращаем None (ошибка)
+        return None
     result = db.projects.insert_one(project_dict)
-    return db.projects.find_one({"_id": result.inserted_id})
+    project = db.projects.find_one({"_id": result.inserted_id})
+    if project and "_id" in project:
+        project["_id"] = str(project["_id"])  # ПРЕОБРАЗУЕМ ObjectId В СТРОКУ!
+    return project
 
 def update_project(project_id: str, project_data: ProjectUpdate) -> dict:
-     """Обновить данные проекта"""
+    """Обновить данные проекта"""
     update_data = {k: v for k, v in project_data.dict().items() if v is not None}
     if not update_data:
         return get_project_by_id(project_id)
@@ -556,30 +574,36 @@ def delete_project(project_id: str) -> bool:
 
 # СRUD ФУНКЦИИ ДЛЯ ЗАДАЧ (Task CRUD)
 def get_task_by_id(task_id: str):
-     """Найти задачу по ID""" 
+    """Найти задачу по ID"""
     try:
         obj_id = ObjectId(task_id)
     except:
         return None
-    return db.tasks.find_one({"_id": obj_id})
+    task = db.tasks.find_one({"_id": obj_id})
+    if task and "_id" in task:
+        task["_id"] = str(task["_id"])
+    return task
 
 def get_all_tasks(skip: int = 0, limit: int = 100, filters: dict = None):
-    """Получить список задач с пагинацией и фильтрацией filters - словарь с условиями поиска (например {"status": "todo"})"""
+    """Получить список задач с пагинацией и фильтрацией"""
     if filters is None:
-        filters = {} 
-# cursor — итератор по результатам запроса
+        filters = {}
     cursor = db.tasks.find(filters).skip(skip).limit(limit)
-    return list(cursor) # преобразуем курсор в список
+    tasks = list(cursor)
+    for task in tasks:
+        if "_id" in task:
+            task["_id"] = str(task["_id"])
+    return tasks
 
 def create_task(task_data: TaskCreate) -> dict:
-     """Создать новую задачу с проверкой существования проекта и исполнителя"""
-    task_dict = task_data.dict()
+    """Создать новую задачу с проверкой существования проекта и исполнителя"""
+    task_dict = task_data.model_dump()  # заменили .dict() на .model_dump() (новый синтаксис Pydantic)
     task_dict["created_at"] = datetime.now(timezone.utc)
     task_dict["updated_at"] = datetime.now(timezone.utc)
-# проверяем существование проекта
+    # проверяем существование проекта
     if not get_project_by_id(task_dict["project_id"]):
         return None
- # проверяем существование исполнителя (если указан)
+    # проверяем существование исполнителя (если указан)
     if task_dict.get("assignee_id"):
         try:
             if not db.users.find_one({"_id": ObjectId(task_dict["assignee_id"])}):
@@ -587,7 +611,10 @@ def create_task(task_data: TaskCreate) -> dict:
         except:
             return None
     result = db.tasks.insert_one(task_dict)
-    return db.tasks.find_one({"_id": result.inserted_id})
+    task = db.tasks.find_one({"_id": result.inserted_id})
+    if task and "_id" in task:
+        task["_id"] = str(task["_id"])  # ПРЕОБРАЗУЕМ ObjectId В СТРОКУ!
+    return task
 
 def update_task(task_id: str, task_data: TaskUpdate) -> dict:
     """Обновить данные задачи"""
@@ -1595,7 +1622,7 @@ def read_client(client_id: str, current_user: dict = Depends(get_current_user)):
 
 @app.post("/api/clients", response_model=ClientInDB, status_code=201)
 def create_new_client(client_data: ClientCreate, current_user: dict = Depends(get_current_user)):
-     """POST /api/clients Создаёт нового клиента из данных в теле запроса. Возвращает созданного клиента с присвоенным ID.""" 
+    """POST /api/clients Создаёт нового клиента из данных в теле запроса. Возвращает созданного клиента с присвоенным ID.""" 
     return create_client(client_data)
 
 @app.put("/api/clients/{client_id}", response_model=ClientInDB)
@@ -1619,7 +1646,7 @@ def read_projects(skip: int = 0, limit: int = 100, current_user: dict = Depends(
 
 @app.get("/api/projects/{project_id}", response_model=ProjectInDB)
 def read_project(project_id: str, current_user: dict = Depends(get_current_user)):
-     """GET /api/projects/{project_id} - один проект по ID"""
+    """GET /api/projects/{project_id} - один проект по ID"""
     project = get_project_by_id(project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -1656,7 +1683,7 @@ def read_tasks(
     project_id: Optional[str] = None,
     current_user: dict = Depends(get_current_user)
 ):
-     """
+    """
     GET /api/tasks Возвращает список задач с фильтрацией и пагинацией. Параметры фильтрации (все необязательные):
     - status: статус задачи (todo, in_progress, done)
     - assignee_id: ID исполнителя
@@ -1689,7 +1716,7 @@ def create_new_task(task_data: TaskCreate, current_user: dict = Depends(get_curr
 
 @app.put("/api/tasks/{task_id}", response_model=TaskInDB)
 def update_existing_task(task_id: str, task_data: TaskUpdate, current_user: dict = Depends(get_current_user)):
-     """PUT /api/tasks/{task_id} - обновляет задачу"""
+    """PUT /api/tasks/{task_id} - обновляет задачу"""
     updated = update_task(task_id, task_data)
     if not updated:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -1712,4 +1739,3 @@ def delete_existing_task(task_id: str, current_user: dict = Depends(get_current_
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8001)
-
