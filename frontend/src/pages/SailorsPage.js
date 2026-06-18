@@ -1,3 +1,4 @@
+// Импорт необходимых компонентов и хуков
 import React, { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { 
@@ -14,15 +15,16 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { getSailors, deleteSailor, createSailor } from '../utils/api';
 import { cn, formatDate, getStatusColor } from '../utils/helpers';
 import { toast } from 'sonner';
-
+// Массив статусов для фильтрации
 const statusOptions = [
   { value: '', labelRu: 'Все статусы', labelEn: 'All statuses' },
   { value: 'available', labelRu: 'Доступны', labelEn: 'Available' },
   { value: 'on_voyage', labelRu: 'В рейсе', labelEn: 'On Voyage' },
   { value: 'not_available', labelRu: 'Недоступны', labelEn: 'Not Available' },
 ];
-
+// Главный компонент страницы моряков
 export default function SailorsPage() {
+ // Состояния для данных и управления
   const { t, language } = useLanguage();
   const [searchParams, setSearchParams] = useSearchParams();
   const [sailors, setSailors] = useState([]);
@@ -30,11 +32,11 @@ export default function SailorsPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '');
   const [showAddModal, setShowAddModal] = useState(false);
-
+  // Загрузка моряков при изменении фильтра
   useEffect(() => {
     loadSailors();
   }, [statusFilter]);
-
+  // Функция загрузки данных с бэкенда
   const loadSailors = async () => {
     try {
       const params = {};
@@ -73,7 +75,7 @@ export default function SailorsPage() {
       setSearchParams({});
     }
   };
-
+// Отрисовка звезд рейтинга
   const renderStars = (rating) => {
     return (
       <div className="flex gap-0.5">
@@ -87,7 +89,7 @@ export default function SailorsPage() {
       </div>
     );
   };
-
+ // Основной рендер страницы
   return (
     <div className="animate-fade-in" data-testid="sailors-page">
       {/* Header */}
@@ -227,7 +229,7 @@ export default function SailorsPage() {
         )}
       </div>
 
-      {/* Add Modal */}
+      {/* Модальное окно добавления моряка */}
       {showAddModal && (
         <AddSailorModal 
           onClose={() => setShowAddModal(false)} 
@@ -240,7 +242,7 @@ export default function SailorsPage() {
     </div>
   );
 }
-
+// Компонент модального окна для добавления моряка
 const AddSailorModal = ({ onClose, onSuccess }) => {
   const { t, language } = useLanguage();
   const [loading, setLoading] = useState(false);
