@@ -271,9 +271,10 @@ export default function VacanciesPage() {
       {showForm && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => setShowForm(false)}>
           <div 
-            className="bg-maritime-card border border-slate-800 rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl" 
-            onClick={(e) => e.stopPropagation()}
-          >
+  className="bg-maritime-card border border-slate-800 rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl" 
+  style={{ marginTop: '80px' }}
+  onClick={(e) => e.stopPropagation()}
+>
             <div className="sticky top-0 p-6 border-b border-slate-800 bg-maritime-card z-10 flex items-center justify-between">
               <h2 className="font-heading text-2xl font-bold text-white">
                 {editingVacancy 
