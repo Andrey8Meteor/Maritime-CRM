@@ -268,7 +268,7 @@ export default function VacanciesPage() {
         </div>
       )}
 
-      {showForm && (
+  {showForm && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => setShowForm(false)}>
           <div 
   className="bg-maritime-card border border-slate-800 rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl" 
