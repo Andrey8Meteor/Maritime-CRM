@@ -124,3 +124,43 @@ h1, h2, h3, h4, h5, h6 {
   border: 1px solid rgba(245, 158, 11, 0.4);
 }
 
+/* ===== ФИКСЫ ДЛЯ ФОРМ И ДАШБОРДА ===== */
+
+/* 1. Отступ для всех форм на сайте */
+form {
+    margin-top: 24px;
+    padding-top: 8px;
+}
+
+/* 2. Для форм внутри модальных окон */
+.modal-content form,
+.ant-modal-body form,
+[role="dialog"] form {
+    margin-top: 32px;
+    padding-top: 12px;
+}
+
+/* 3. Для страниц с формами (если есть общий контейнер) */
+.page-container,
+.main-content,
+[class*="Page"] > div:first-child {
+    padding-top: 20px;
+}
+
+/* 4. Для форм добавления (моряки, компании, контракты) */
+form > div:first-child,
+form .form-group:first-child,
+form .field:first-child {
+    margin-top: 8px;
+}
+
+/* 5. Если используется компонент Card или Section */
+.card-form,
+.section-form {
+    margin-top: 16px;
+}
+
+/* 6. Дополнительный отступ для кнопок в формах */
+form button[type="submit"] {
+    margin-top: 12px;
+}
