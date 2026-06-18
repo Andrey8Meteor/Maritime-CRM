@@ -1,9 +1,10 @@
+/* Импорт шрифтов Google */
 @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Manrope:wght@400;500;600;700&display=swap');
-
+/* Настройка Tailwind CSS */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
+/* CSS-переменные для цветовой схемы */
 :root {
   --color-primary: #0EA5E9;
   --color-primary-hover: #0284C7;
@@ -16,7 +17,7 @@
   --color-accent-green: #10B981;
   --color-accent-amber: #F59E0B;
 }
-
+/* Глобальные стили для страницы */
 * {
   margin: 0;
   padding: 0;
