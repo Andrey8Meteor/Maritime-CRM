@@ -283,15 +283,16 @@ const AddSailorModal = ({ onClose, onSuccess }) => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-overlay" onClick={onClose}>
       <div 
-        className="bg-maritime-card border border-slate-800 rounded-md w-full max-w-2xl max-h-[90vh] overflow-y-auto"
-        onClick={e => e.stopPropagation()}
-      >
+  className="bg-maritime-card border border-slate-800 rounded-md w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+  style={{ marginTop: '80px' }}
+  onClick={e => e.stopPropagation()}
+>
         <div className="p-6 border-b border-slate-800">
           <h2 className="font-heading text-2xl font-semibold text-white">
             {language === 'ru' ? 'Добавить моряка' : 'Add Sailor'}
           </h2>
         </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4 mt-8">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">{t('fullName')} *</label>
