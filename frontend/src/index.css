@@ -164,3 +164,60 @@ form .field:first-child {
 form button[type="submit"] {
     margin-top: 12px;
 }
+
+/* ===== ГЛОБАЛЬНЫЕ ОТСТУПЫ ДЛЯ ВСЕХ МОДАЛЬНЫХ ОКОН ===== */
+
+/* Все модальные окна с формами */
+.modal-overlay {
+    align-items: flex-start !important;
+    padding-top: 60px !important;
+}
+
+/* Внутренний контейнер модального окна */
+.modal-overlay > div {
+    margin-top: 40px !important;
+}
+
+/* Все формы внутри модальных окон */
+.modal-overlay form {
+    margin-top: 20px !important;
+}
+
+/* Если у форм есть класс p-6 или space-y-4 */
+.modal-overlay .p-6.space-y-4 {
+    margin-top: 24px !important;
+}
+/* Дополнительный отступ для всех модальных окон */
+.modal-overlay {
+    align-items: flex-start !important;
+    padding-top: 100px !important;
+}
+
+/* Для мобильных устройств */
+@media (max-width: 768px) {
+    .modal-overlay {
+        padding-top: 140px !important;
+    }
+}
+/* СУПЕР-ФИКС: принудительный отступ для всех модальных окон */
+.modal-overlay {
+    align-items: flex-start !important;
+    padding-top: 120px !important;
+}
+
+/* Для мобильных устройств */
+@media (max-width: 768px) {
+    .modal-overlay {
+        padding-top: 180px !important;
+    }
+}
+
+/* Дополнительный отступ для самого модального окна */
+.modal-overlay > div {
+    margin-top: 40px !important;
+}
+
+/* Если внутри модалки есть форма */
+.modal-overlay form {
+    margin-top: 30px !important;
+}
