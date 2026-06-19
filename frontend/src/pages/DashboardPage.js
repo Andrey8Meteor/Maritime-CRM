@@ -60,26 +60,72 @@ export default function DashboardPage() {
       loadDashboardData();
     }
   }, [isAuthenticated, authLoading]);
+const loadDashboardData = async () => {
+  if (!isAuthenticated || authLoading) {
+    return;
+  }
 
-  const loadDashboardData = async () => {
-    if (!isAuthenticated || authLoading || dataLoading) {
-      return;
-    }
+  try {
+    setDataLoading(true);
+    // ЗАГЛУШКА: демо-данные для дашборда
+    const demoData = {
+      stats: {
+        total_sailors: 12,
+        available_sailors: 5,
+        open_vacancies: 4,
+        active_contracts: 3,
+        total_companies: 8
+      },
+      expiring_documents: [
+        {
+          sailor_id: '1',
+          sailor_name: 'Сергей Морозов',
+          document_type: 'Seaman Passport',
+          expiry_date: '2026-07-15T00:00:00Z',
+          days_remaining: 28
+        },
+        {
+          sailor_id: '2',
+          sailor_name: 'Александр Волков',
+          document_type: 'STCW',
+          expiry_date: '2026-08-10T00:00:00Z',
+          days_remaining: 45
+        }
+      ],
+      upcoming_rotations: [
+        {
+          contract_id: '1',
+          sailor_name: 'Дмитрий Соколов',
+          vessel_name: 'SCF Ural',
+          end_date: '2026-07-05T00:00:00Z'
+        }
+      ],
+      recent_sailors: [
+        {
+          id: '1',
+          full_name: 'Сергей Морозов',
+          position: 'Captain',
+          status: 'available'
+        },
+        {
+          id: '2',
+          full_name: 'Александр Волков',
+          position: 'Chief Engineer',
+          status: 'available'
+        }
+      ]
+    };
 
-    try {
-      setDataLoading(true);
-      const response = await getDashboardSummary();
-      const data = response.data;
-      setStats(data.stats);
-      setExpiringDocs(data.expiring_documents || []);
-      setRotations(data.upcoming_rotations || []);
-      setRecentSailors(data.recent_sailors || []);
-    } catch (error) {
-      toast.error(language === 'ru' ? 'Ошибка загрузки данных' : 'Failed to load data');
-    } finally {
-      setDataLoading(false);
-    }
-  };
+    setStats(demoData.stats);
+    setExpiringDocs(demoData.expiring_documents || []);
+    setRotations(demoData.upcoming_rotations || []);
+    setRecentSailors(demoData.recent_sailors || []);
+  } catch (error) {
+    toast.error(language === 'ru' ? 'Ошибка загрузки данных' : 'Failed to load data');
+  } finally {
+    setDataLoading(false);
+  }
+};
 
   const handleSendNotifications = async () => {
     if (!isAuthenticated || authLoading || sendingNotifications || expiringDocs.length === 0) {
