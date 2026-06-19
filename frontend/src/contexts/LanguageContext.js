@@ -4,7 +4,7 @@ const translations = {
   ru: {
     // Navigation
     dashboard: 'Панель управления',
-    sailors: 'Моряки',
+    sailors: 'Клиенты',                    // ← ИЗМЕНЕНО
     companies: 'Компании',
     vacancies: 'Вакансии',
     contracts: 'Контракты',
@@ -13,37 +13,38 @@ const translations = {
     logout: 'Выход',
     
     // Dashboard
-    totalSailors: 'Всего моряков',
-    availableSailors: 'Доступны',
+    totalSailors: 'Всего клиентов',        // ← ИЗМЕНЕНО
+    availableSailors: 'Доступные клиенты', // ← ИЗМЕНЕНО
     openVacancies: 'Открытые вакансии',
     activeContracts: 'Активные контракты',
     totalCompanies: 'Компании',
     expiringDocuments: 'Истекающие документы',
     upcomingRotations: 'Ближайшие ротации',
-    recentSailors: 'Новые резюме',
+    recentSailors: 'Новые клиенты',        // ← ИЗМЕНЕНО
     daysLeft: 'дней осталось',
     
-    // Status
-    available: 'Доступен',
-    onVoyage: 'В рейсе',
-    notAvailable: 'Недоступен',
-    open: 'Открыта',
-    inProgress: 'В работе',
-    closed: 'Закрыта',
-    atSea: 'Судно в море',
+    // Статусы (для клиентов, задач, проектов)
+   available: 'Активен',
+   onVoyage: 'В работе',
+   notAvailable: 'Неактивен',
+   open: 'Открыт',
+   inProgress: 'В процессе',
+   closed: 'Закрыт',
+   atSea: 'Ожидание',
     
-    // Contract status
-    preparation: 'Подготовка документов',
-    flight: 'Перелет',
-    onBoard: 'На борту',
-    completed: 'Завершен',
+    // Статусы контрактов/задач
+   preparation: 'Подготовка',
+   flight: 'В процессе',
+   onBoard: 'Выполняется',
+   completed: 'Завершён',
+
     
-    // Pipeline stages
-    contact: 'Контакт',
-    interview: 'Собеседование',
-    offer: 'Оффер',
-    documents: 'Документы',
-    joined: 'На борту',
+    // Этапы воронки (для работы с клиентами)
+   contact: 'Контакт',
+   interview: 'Переговоры',
+   offer: 'Предложение',
+   documents: 'Документы',
+   joined: 'Сотрудничает',
     
     // Vessel types
     tanker: 'Танкер',
@@ -106,7 +107,7 @@ const translations = {
   en: {
     // Navigation
     dashboard: 'Dashboard',
-    sailors: 'Sailors',
+    sailors: 'Clients',                    // ← ИЗМЕНЕНО
     companies: 'Companies',
     vacancies: 'Vacancies',
     contracts: 'Contracts',
@@ -115,14 +116,14 @@ const translations = {
     logout: 'Logout',
     
     // Dashboard
-    totalSailors: 'Total Sailors',
-    availableSailors: 'Available',
+    totalSailors: 'Total Clients',         // ← ИЗМЕНЕНО
+    availableSailors: 'Available Clients', // ← ИЗМЕНЕНО
     openVacancies: 'Open Vacancies',
     activeContracts: 'Active Contracts',
     totalCompanies: 'Companies',
     expiringDocuments: 'Expiring Documents',
     upcomingRotations: 'Upcoming Rotations',
-    recentSailors: 'Recent Resumes',
+    recentSailors: 'Recent Clients',       // ← ИЗМЕНЕНО
     daysLeft: 'days left',
     
     // Status
