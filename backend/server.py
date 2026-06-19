@@ -29,11 +29,11 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-# Database
+# Подключение к MongoDB
 client = MongoClient(settings.mongo_url)
 db = client[settings.db_name]
 
-# Password hashing
+## Настройка хеширования паролей (bcrypt)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 app = FastAPI(title="MaritimeCRM API", version="1.0.0")
@@ -412,7 +412,7 @@ def serialize_doc(doc: dict) -> dict:
 
 def serialize_docs(docs: list) -> list:
     return [serialize_doc(doc) for doc in docs if doc is not None]
-
+"Реализовали полноценную JWT-аутентификацию — создание токенов, проверку паролей, получение текущего пользователя из токена."
 def create_access_token(data: dict) -> str:
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + timedelta(hours=settings.jwt_expiration_hours)
@@ -585,15 +585,12 @@ def get_task_by_id(task_id: str):
     return task
 
 def get_all_tasks(skip: int = 0, limit: int = 100, filters: dict = None):
-    """Получить список задач с пагинацией и фильтрацией"""
+    """Получить список задач с пагинацией и фильтрацией filters - словарь с условиями поиска (например {"status": "todo"})"""
     if filters is None:
-        filters = {}
+        filters = {} 
+# cursor — итератор по результатам запроса
     cursor = db.tasks.find(filters).skip(skip).limit(limit)
-    tasks = list(cursor)
-    for task in tasks:
-        if "_id" in task:
-            task["_id"] = str(task["_id"])
-    return tasks
+    return list(cursor) # преобразуем курсор в список
 
 def create_task(task_data: TaskCreate) -> dict:
     """Создать новую задачу с проверкой существования проекта и исполнителя"""
@@ -1051,9 +1048,30 @@ async def get_dashboard_summary(current_user = Depends(get_current_user)):
 
 @app.get("/api/dashboard/expiring-documents")
 async def get_expiring_documents(current_user = Depends(get_current_user)):
+    # Проверяем, есть ли данные в базе
+    total_sailors = db.sailors.count_documents({})
     
+    # Если данных нет — возвращаем демо-данные
+    if total_sailors == 0:
+        return [
+            {
+                "sailor_id": "1",
+                "sailor_name": "Сергей Морозов",
+                "document_type": "Seaman Passport",
+                "expiry_date": "2026-07-15T00:00:00Z",
+                "days_remaining": 28
+            },
+            {
+                "sailor_id": "2",
+                "sailor_name": "Александр Волков",
+                "document_type": "STCW",
+                "expiry_date": "2026-08-10T00:00:00Z",
+                "days_remaining": 45
+            }
+        ]
+    
+    # Если данные есть — считаем из базы
     three_months_from_now = datetime.now(timezone.utc) + timedelta(days=90)
-    
     sailors = list(db.sailors.find({}))
     expiring = []
     
@@ -1079,6 +1097,21 @@ async def get_expiring_documents(current_user = Depends(get_current_user)):
 async def get_upcoming_rotations(authorization: Optional[str] = None):
     get_current_user(authorization)
     
+    # Проверяем, есть ли данные в базе
+    total_contracts = db.contracts.count_documents({})
+    
+    # Если данных нет — возвращаем демо-данные
+    if total_contracts == 0:
+        return [
+            {
+                "contract_id": "1",
+                "sailor_name": "Дмитрий Соколов",
+                "vessel_name": "SCF Ural",
+                "end_date": "2026-07-05T00:00:00Z"
+            }
+        ]
+    
+    # Если данные есть — считаем из базы
     one_month_from_now = datetime.now(timezone.utc) + timedelta(days=30)
     
     contracts = list(db.contracts.find({
@@ -1104,6 +1137,28 @@ async def get_upcoming_rotations(authorization: Optional[str] = None):
 @app.get("/api/dashboard/recent-sailors")
 async def get_recent_sailors(limit: int = 5, authorization: Optional[str] = None):
     get_current_user(authorization)
+    
+    # Проверяем, есть ли данные в базе
+    total_sailors = db.sailors.count_documents({})
+    
+    # Если данных нет — возвращаем демо-данные
+    if total_sailors == 0:
+        return [
+            {
+                "id": "1",
+                "full_name": "Сергей Морозов",
+                "position": "Captain",
+                "status": "available"
+            },
+            {
+                "id": "2",
+                "full_name": "Александр Волков",
+                "position": "Chief Engineer",
+                "status": "available"
+            }
+        ]
+    
+    # Если данные есть — считаем из базы
     sailors = list(db.sailors.find().sort("created_at", -1).limit(limit))
     return serialize_docs(sailors)
 
