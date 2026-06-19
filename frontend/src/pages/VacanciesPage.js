@@ -36,9 +36,25 @@ export default function VacanciesPage() {
   const [formData, setFormData] = useState({});
   const [formLoading, setFormLoading] = useState(false);
 
+  const loadData = React.useCallback(async () => {
+    try {
+      const params = statusFilter ? { status: statusFilter } : {};
+      const [vacanciesRes, companiesRes] = await Promise.all([
+        getVacancies(params),
+        getCompanies()
+      ]);
+      setVacancies(vacanciesRes.data);
+      setCompanies(companiesRes.data);
+    } catch (error) {
+      toast.error(language === 'ru' ? 'Ошибка загрузки' : 'Failed to load');
+    } finally {
+      setLoading(false);
+    }
+  }, [language, statusFilter]);
+
   useEffect(() => {
     loadData();
-  }, [statusFilter]);
+  }, [loadData]);
 
   useEffect(() => {
     if (editingVacancy) {
@@ -52,7 +68,7 @@ export default function VacanciesPage() {
         english_required: editingVacancy.english_required || false,
         salary_min: editingVacancy.salary_min || '',
         salary_max: editingVacancy.salary_max || '',
-        currency: editingVacancy.currency || 'RUB',
+        currency: editingVacancy.currency || 'USD',
         start_date: editingVacancy.start_date ? editingVacancy.start_date.split('T')[0] : '',
         contract_duration_months: editingVacancy.contract_duration_months || 4,
         status: editingVacancy.status || 'open',
@@ -69,7 +85,7 @@ export default function VacanciesPage() {
         english_required: false,
         salary_min: '',
         salary_max: '',
-        currency: 'RUB',
+        currency: 'USD',
         start_date: '',
         contract_duration_months: 4,
         status: 'open',
@@ -78,21 +94,6 @@ export default function VacanciesPage() {
     }
   }, [editingVacancy, companies]);
 
-  const loadData = async () => {
-    try {
-      const params = statusFilter ? { status: statusFilter } : {};
-      const [vacanciesRes, companiesRes] = await Promise.all([
-        getVacancies(params),
-        getCompanies()
-      ]);
-      setVacancies(vacanciesRes.data);
-      setCompanies(companiesRes.data);
-    } catch (error) {
-      toast.error(language === 'ru' ? 'Ошибка загрузки' : 'Failed to load');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleFormSubmit = async (e) => {
     e.preventDefault();
@@ -268,13 +269,12 @@ export default function VacanciesPage() {
         </div>
       )}
 
-  {showForm && (
+      {showForm && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => setShowForm(false)}>
-        <div 
-  className="bg-maritime-card border border-slate-800 rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl" 
-  style={{ marginTop: '80px' }}
-  onClick={(e) => e.stopPropagation()}
->
+          <div 
+            className="bg-maritime-card border border-slate-800 rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl" 
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="sticky top-0 p-6 border-b border-slate-800 bg-maritime-card z-10 flex items-center justify-between">
               <h2 className="font-heading text-2xl font-bold text-white">
                 {editingVacancy 
